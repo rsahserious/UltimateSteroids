@@ -113,6 +113,7 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 	private Sound mShipEngineSound;
 	private Sound mProjectileFireSound;
 	private Sound mRockHitSound;
+	private Sound mRockDestroySound;
 	
 	
 	// ====================================================
@@ -219,6 +220,7 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 			this.mShipEngineSound = SoundFactory.createSoundFromAsset(this.mEngine.getSoundManager(), this, "ship_engine.ogg");
 			this.mProjectileFireSound = SoundFactory.createSoundFromAsset(this.mEngine.getSoundManager(), this, "projectile_fire.ogg");
 			this.mRockHitSound = SoundFactory.createSoundFromAsset(this.mEngine.getSoundManager(), this, "rock_hit.ogg");
+			this.mRockDestroySound = SoundFactory.createSoundFromAsset(this.mEngine.getSoundManager(), this, "rock_destroy.ogg");
 		} 
 		catch (final IOException e) 
 		{
@@ -382,18 +384,22 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 					final float energy = projectile.getEnergy();
 					
 					rock.giveDamage(energy / 2);
+					
+					/* Check if the rock is destroyed */
 					if(rock.life <= 0)
 					{
 						destroyRock(rock);
 					}
-					
-					emitProjectileParticles(projectile, contact.getFixtureA().getBody(), energy);
-					
-					if(energy > 0)
+					else
 					{
-						mRockHitSound.setVolume((energy + 0.15f) > 1.0f ? 1.0f : (energy + 0.15f)); // The volume is proportional to the projectile's energy (+0.15 offset)
-				       	mRockHitSound.setRate((rand.nextFloat() * 0.4f) + 0.8f); // Let's change the rate (speed) of this sound with a little +/- offset
-				       	mRockHitSound.play();
+						if(energy > 0)
+						{
+							emitProjectileParticles(projectile, contact.getFixtureA().getBody(), energy);
+							
+							mRockHitSound.setVolume((energy + 0.15f) > 1.0f ? 1.0f : (energy + 0.15f)); // The volume is proportional to the projectile's energy (+0.15 offset)
+					       	mRockHitSound.setRate((rand.nextFloat() * 0.4f) + 0.8f); // Let's change the rate (speed) of this sound with a little +/- offset
+					       	mRockHitSound.play();
+						}
 					}
 					
 					destroyProjectile(projectile);
@@ -679,8 +685,13 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 	private void destroyRock(Rock rock)
 	{
 		d("DESTROY ROCK BEGIN");
+		Random rand = new Random();
+		
 		/* Destroy the rock */
 		nextToDestroyRock.add(rock);
+		
+       	mRockDestroySound.setRate((rand.nextFloat() * 0.5f) + 0.75f); // Let's change the rate (actually speed) of this sound with a little +/- offset
+       	mRockDestroySound.play();
 		
 		/* Create smaller rocks - pieces - if it wasn't the smallest */
 		if(rock.bodySize > Rock.BODY_SIZE_SMALL)
