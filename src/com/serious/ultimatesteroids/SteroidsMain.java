@@ -356,12 +356,6 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 	        
         	mShipBody = PhysicsFactory.createPolygonBody(this.mPhysicsWorld, mShip, vertices_L, BodyType.DynamicBody, FIXTURE_DEF_SHIP);
 
-        	/*PolygonShape polygonShape = new PolygonShape();
-        	polygonShape.set(vertices_R);
-        	FixtureDef fixture = FIXTURE_DEF_SHIP;
-        	fixture.shape = polygonShape;
-        	mShipBody.createFixture(fixture);*/
-        	
 	       	this.mPhysicsWorld.registerPhysicsConnector(new PhysicsConnector(mShip, mShipBody, true, true));
 	       	
 	       	mShipBody.setFixedRotation(true);

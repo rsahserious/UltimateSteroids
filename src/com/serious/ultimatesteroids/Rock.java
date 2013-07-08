@@ -45,13 +45,11 @@ public class Rock extends Sprite
 	public void setCenterX(float pX)
 	{
 		setX(pX - (sizeX / 2));
-		Log.d("srs", "setCenterX: " + pX);
 	}
 	
 	public void setCenterY(float pY)
 	{
 		setY(pY - (sizeY / 2));
-		Log.d("srs", "setCenterY: " + pY);
 	}
 
 	public void giveDamage(float dmg)
