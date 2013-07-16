@@ -41,4 +41,6 @@ public class Projectile extends Sprite
 
 		return (1 - timeElapsed);
 	}
+	
+	
 }

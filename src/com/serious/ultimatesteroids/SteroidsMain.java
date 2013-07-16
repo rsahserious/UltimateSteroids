@@ -19,6 +19,7 @@ import org.andengine.entity.modifier.ScaleModifier;
 import org.andengine.entity.particle.SpriteParticleSystem;
 import org.andengine.entity.particle.emitter.PointParticleEmitter;
 import org.andengine.entity.particle.initializer.AccelerationParticleInitializer;
+import org.andengine.entity.particle.initializer.ColorParticleInitializer;
 import org.andengine.entity.particle.initializer.RotationParticleInitializer;
 import org.andengine.entity.particle.initializer.VelocityParticleInitializer;
 import org.andengine.entity.particle.modifier.AlphaParticleModifier;
@@ -26,6 +27,7 @@ import org.andengine.entity.particle.modifier.ColorParticleModifier;
 import org.andengine.entity.particle.modifier.ExpireParticleInitializer;
 import org.andengine.entity.particle.modifier.RotationParticleModifier;
 import org.andengine.entity.particle.modifier.ScaleParticleModifier;
+import org.andengine.entity.primitive.Rectangle;
 import org.andengine.entity.scene.IOnSceneTouchListener;
 import org.andengine.entity.scene.Scene;
 import org.andengine.entity.scene.background.SpriteBackground;
@@ -42,6 +44,7 @@ import org.andengine.opengl.texture.region.TextureRegion;
 import org.andengine.ui.activity.SimpleBaseGameActivity;
 import org.andengine.util.debug.Debug;
 
+import android.graphics.Rect;
 import android.util.Log;
 
 import com.badlogic.gdx.math.Vector2;
@@ -104,6 +107,7 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 	
 	/* Particles */
 	private TextureRegion mParticleShipFireTextureRegion;
+	private TextureRegion mDustTextureRegion;
 	
 	
 	// ====================================================
@@ -148,6 +152,7 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 	List<Projectile> mProjectile = new ArrayList<Projectile>();
 	List<Rock> mRock = new ArrayList<Rock>();
 	List<SpriteParticleSystem> mProjectileParticleSystem = new ArrayList<SpriteParticleSystem>();
+	List<SpriteParticleSystem> mRockDestroyParticleSystem = new ArrayList<SpriteParticleSystem>();
 
 	long lastProjectileFire;
 	
@@ -204,6 +209,7 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 		
 		/* Particles */
 		this.mParticleShipFireTextureRegion = BitmapTextureAtlasTextureRegionFactory.createFromAsset(this.mFirstBitmapTextureAtlas, this, "particle_fire.png", BUTTON_WIDTH * 4, 0);
+		this.mDustTextureRegion = BitmapTextureAtlasTextureRegionFactory.createFromAsset(this.mFirstBitmapTextureAtlas, this, "dust.png", BUTTON_WIDTH * 5, 0);
 		
 		this.mFirstBitmapTextureAtlas.load();
 		this.mSecondBitmapTextureAtlas.load();
@@ -383,16 +389,17 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 					Random rand = new Random();
 					final float energy = projectile.getEnergy();
 					
-					rock.giveDamage(energy / 2);
-					
-					/* Check if the rock is destroyed */
-					if(rock.life <= 0)
+					if(energy > 0)
 					{
-						destroyRock(rock);
-					}
-					else
-					{
-						if(energy > 0)
+						rock.giveDamage(energy / 3f);
+						
+						/* Check if the rock is destroyed */
+						if(rock.life <= 0)
+						{
+							emitRockDestroyParticles(rock);
+							destroyRock(rock);
+						}
+						else
 						{
 							emitProjectileParticles(projectile, contact.getFixtureA().getBody(), energy);
 							
@@ -400,7 +407,7 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 					       	mRockHitSound.setRate((rand.nextFloat() * 0.4f) + 0.8f); // Let's change the rate (speed) of this sound with a little +/- offset
 					       	mRockHitSound.play();
 						}
-					}
+                	}
 					
 					destroyProjectile(projectile);
                 }
@@ -501,7 +508,7 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
         };
 	}
 	
-	private void onSceneUpdate()
+	private synchronized void onSceneUpdate()
 	{
 		/* Create new waiting objects */
 		for(int i = 0; i < nextToSpawnRock.size(); i++)
@@ -675,6 +682,19 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
         		mProjectileParticleSystem.remove(i);
         	}
         }
+        
+        /* Rock destroy particle system - TODO? */ 
+        for(int i = 0; i < mRockDestroyParticleSystem.size(); i++)
+        {
+        	final SpriteParticleSystem particleSystem = mRockDestroyParticleSystem.get(i);
+        	final long pStartTime = (Integer) particleSystem.getUserData();
+
+        	if((int) (System.currentTimeMillis() / 100) - pStartTime >= 3)
+        	{
+        		particleSystem.setParticlesSpawnEnabled(false);
+        		mRockDestroyParticleSystem.remove(i);
+        	}
+        }
 	}
 
 	private void destroyProjectile(Projectile proj)
@@ -741,6 +761,7 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 		
 		Rock rock = new Rock(bodySize, pX, pY, mRockTextureRegion[textureId], this.getVertexBufferObjectManager());
 		d("1");
+		// TODO: (debug)
 		Body rockBody = PhysicsFactory.createPolygonBody(this.mPhysicsWorld, rock, vertices, BodyType.DynamicBody, FIXTURE_DEF_ROCK);
 		d("2");
 		this.mPhysicsWorld.registerPhysicsConnector(new PhysicsConnector(rock, rockBody, true, true));
@@ -763,6 +784,8 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
     		rockBody.setLinearVelocity(vX, vY);
     		rockBody.setAngularVelocity(-0.5f + (rand.nextFloat() * 1.0f));
     	}
+    	
+    	rock.setZIndex(0);
     	
     	rockBody.setUserData(rock);
     	rock.setUserData(rockBody);
@@ -827,6 +850,7 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
     	//Body projectileBody = PhysicsFactory.createPolygonBody(this.mPhysicsWorld, projectile, vertices, BodyType.DynamicBody, FIXTURE_DEF_PROJECTILE);
 		Body projectileBody = PhysicsFactory.createCircleBody(this.mPhysicsWorld, 0, 16, 7, BodyType.DynamicBody, FIXTURE_DEF_PROJECTILE);
     	d("2");
+    	// TODO: (debug) make sure that all parameters != null (assertion)
        	this.mPhysicsWorld.registerPhysicsConnector(new PhysicsConnector(projectile, projectileBody, true, true));
        	
        	projectileBody.setLinearVelocity(projectileVelocity);
@@ -875,6 +899,36 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
         
         particleSystem.setUserData((int) (System.currentTimeMillis() / 100));
 	}
+	
+	public void emitRockDestroyParticles(Rock rock)
+	{
+		Body rockBody = (Body) rock.getUserData();
+		
+		Vector2 pos = rockBody.getPosition();
+		
+		final float pX = (pos.x * PIXEL_TO_METER_RATIO_DEFAULT) - (mDustTextureRegion.getWidth() / 2);	
+		final float pY = (pos.y * PIXEL_TO_METER_RATIO_DEFAULT) - (mDustTextureRegion.getHeight() / 2);
+
+		final float MIN_RATE = 150 * rock.bodySize;
+        final float MAX_RATE = 150 * rock.bodySize;
+        final int PARTICLES = (int) (50 * rock.bodySize);
+		
+		PointParticleEmitter particleEmitter = new PointParticleEmitter(pX, pY);
+        SpriteParticleSystem particleSystem = new SpriteParticleSystem(pX, pY, particleEmitter, MIN_RATE, MAX_RATE, PARTICLES, this.mDustTextureRegion, this.getVertexBufferObjectManager());
+
+        particleSystem.addParticleInitializer(new VelocityParticleInitializer<Sprite>(-50, 50, -50, 50));
+        particleSystem.addParticleInitializer(new AccelerationParticleInitializer<Sprite>(-30));
+        particleSystem.addParticleInitializer(new ExpireParticleInitializer<Sprite>(2));
+        particleSystem.addParticleModifier(new ScaleParticleModifier<Sprite>(0, 2, rock.bodySize * 1.2f, rock.bodySize * 1.5f));
+        particleSystem.addParticleModifier(new AlphaParticleModifier<Sprite>(0, 2, 0.4f, 0));
+        
+        mMainScene.attachChild(particleSystem);
+        mRockDestroyParticleSystem.add(particleSystem);
+        
+        particleSystem.setZIndex(-1);
+        
+        particleSystem.setUserData((int) (System.currentTimeMillis() / 100));
+	}
 
 	/* Fire "button" - a whole screen */
 	@Override
@@ -882,9 +936,9 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 	{
 		if(pSceneTouchEvent.isActionDown())
 		{
-			if(!isPointInArea(pSceneTouchEvent.getX(), pSceneTouchEvent.getY(), mAccelerateButton.getX(), mAccelerateButton.getY(), BUTTON_WIDTH, BUTTON_HEIGHT)
-				&& !isPointInArea(pSceneTouchEvent.getX(), pSceneTouchEvent.getY(), mRotateLeftButton.getX(), mRotateLeftButton.getY(), BUTTON_WIDTH, BUTTON_HEIGHT)
-				&& !isPointInArea(pSceneTouchEvent.getX(), pSceneTouchEvent.getY(), mRotateRightButton.getX(), mRotateRightButton.getY(), BUTTON_WIDTH, BUTTON_HEIGHT)
+			if(!Utils.isPointInArea(pSceneTouchEvent.getX(), pSceneTouchEvent.getY(), mAccelerateButton.getX(), mAccelerateButton.getY(), BUTTON_WIDTH, BUTTON_HEIGHT)
+				&& !Utils.isPointInArea(pSceneTouchEvent.getX(), pSceneTouchEvent.getY(), mRotateLeftButton.getX(), mRotateLeftButton.getY(), BUTTON_WIDTH, BUTTON_HEIGHT)
+				&& !Utils.isPointInArea(pSceneTouchEvent.getX(), pSceneTouchEvent.getY(), mRotateRightButton.getX(), mRotateRightButton.getY(), BUTTON_WIDTH, BUTTON_HEIGHT)
 				&& System.currentTimeMillis() - lastProjectileFire > PROJECTILE_INTERVAL)
 			{
 				mShooting = true;
@@ -895,22 +949,6 @@ public class SteroidsMain extends SimpleBaseGameActivity implements IOnSceneTouc
 			mShooting = false;
 		}
 		
-		return false;
-	}
-	
-	public boolean isPointInCircleArea(float pX, float pY, float cX, float cY, float radius)
-	{
-		if(Math.sqrt(Math.pow((double) (cX - pX), 2.0) + Math.pow((double) (cY - pY), 2)) <= radius)
-			return true;
-
-		return false;
-	}
-	
-	public boolean isPointInArea(float pX, float pY, float aX, float aY, float width, float height)
-	{
-		if(pX > aX && pX < width && pY > aY && pY < height)
-			return true;
-	
 		return false;
 	}
 	

@@ -34,12 +34,12 @@ public class Rock extends Sprite
 	
 	public float getCenterX()
 	{
-		return getX() + (sizeX / 2);
+		return getX() + ((sizeX / 2) * bodySize);
 	}
 	
 	public float getCenterY()
 	{
-		return getY() + (sizeY / 2);
+		return getY() + ((sizeY / 2) * bodySize);
 	}
 	
 	public void setCenterX(float pX)
